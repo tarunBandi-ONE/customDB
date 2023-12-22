@@ -71,6 +71,13 @@ typedef struct{
     Pager* pager;
 }Table; //Pages is an array of void pointers ~ arbitrary memory pointers which we use the above offsets that we calculated to figure out size
 
+typedef struct{
+    Table* table;
+    uint32_t row_num;
+    bool end_of_table; // Indicates when one past the last element
+}Cursor;
+
+
 InputBuffer* new_input_buffer()
 {
     InputBuffer* input_buffer = (InputBuffer*)malloc(sizeof(InputBuffer));
@@ -152,13 +159,13 @@ void* get_page(Table* table, uint32_t page_num)
 }
 
 //Function which returns pointer to a specified row
-void* row_slot (Table* table, uint32_t rownum)
+void* cursor_value (Cursor* cursor)
 {
     //Given row n, and m rows per page, the page it's on is n/m
-    uint32_t pageNum = rownum/ROWS_PER_PAGE; 
-    void* page = get_page(table,pageNum);
+    uint32_t pageNum = cursor->row_num/ROWS_PER_PAGE; 
+    void* page = get_page(cursor->table,pageNum);
     //There are ROWS_PER_PAGE rows per page, so using mod we figure out what specific row it is.
-    uint32_t row_offset = rownum % ROWS_PER_PAGE;
+    uint32_t row_offset = cursor->row_num % ROWS_PER_PAGE;
     //specific row within the page * the bytes it takes for each row gives us the amt of bytes to offset
     uint32_t byteOffset = row_offset * ROWSIZE;
     if (page + byteOffset == NULL)
@@ -169,6 +176,33 @@ void* row_slot (Table* table, uint32_t rownum)
     return page + byteOffset;
 }
 
+void cursor_advance(Cursor* cursor)
+{
+    cursor->row_num +=1;
+    if (cursor->row_num >= cursor->table->num_rows)
+    {
+        cursor ->end_of_table = true;
+    }
+}
+
+Cursor* table_start(Table* table)
+{
+    Cursor* cursor = malloc(sizeof(Cursor));
+    cursor->table = table;
+    cursor ->row_num = 0;
+    cursor ->end_of_table = false;
+    return cursor;
+}
+
+Cursor* table_end(Table* table)
+{
+    Cursor* cursor = malloc(sizeof(Cursor));
+    cursor ->table = table;
+    cursor ->row_num = table->num_rows;
+    cursor->end_of_table = true;
+
+    return cursor;
+}
 
 PrepareResult prepare_insert (Statement* s, InputBuffer* B) //Special logic for ensuring insertions are within bounds
 {
@@ -221,33 +255,42 @@ ExecuteResult execute_insert(Table* T, Statement* S)
     {
         return EXECUTE_TABLE_FULL;
     }
+    Cursor* cursor = table_end(T);
     Row* r = &(S->row_toinsert);
-    serialize_row(r,row_slot(T,T->num_rows)); //Copying from from the row, into the void* block 
+    serialize_row(r,cursor_value(cursor)); //Copying from from the row, into the void* block 
     T->num_rows+=1;
+    free(cursor);
     return EXECUTE_SUCCESS;
 
 }
 
 ExecuteResult execute_select(Table* T, Statement* S)
 {
+    Cursor *cursor = table_start(T);
     Row row;
     printf("%d\n",T->num_rows);
-    for(int i=0;i<T->num_rows;i++) 
+
+    while(!cursor->end_of_table)
     {
-        deserialize_row(row_slot(T,i),&row);//Getting every row
+        deserialize_row(cursor_value(cursor),&row);
         printf("(%d, %s, %s)\n",row.id,row.email,row.user);
+        cursor_advance(cursor);
     }
+
+    free(cursor);
     return EXECUTE_SUCCESS;
 }
 
 Pager* pager_open(const char* file)
 {
+
        int fileData = open(file,
      	  O_RDWR | 	// Read/Write mode
      	      O_CREAT,	// Create file if it does not exist
      	  S_IWUSR |	// User write permission
      	      S_IRUSR	// User read permission
      	  );
+
     if (fileData == -1)
     {
         perror("unable to open file\n");
@@ -264,7 +307,11 @@ Pager* pager_open(const char* file)
     }
     return p;
 }
+
+
+
 Table* db_open(const char* file)
+
 {
     Table* T = (Table*)malloc(sizeof(Table));
     Pager* P =  pager_open(file);
