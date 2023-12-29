@@ -16,21 +16,13 @@ A simple custom C database implementation.
 
     ## Introduction
 
-    .
+    This is a database implemented in C. I started this project to learn about how storing data on the disk worked and specifically gain proficiency with the inner workings of a database. 
 
     ## Features
 
+    - B-Trees.
+    - Buffer Pools.
+    - Concurrency and latches. 
 
-    - Feature 1
-    - Feature 2
-    - ...
-
-    ## Getting Started
-
-
-    ### Prerequisites
-
-
-    ### Installation
 
 
