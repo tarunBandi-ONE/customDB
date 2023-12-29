@@ -1,4 +1,4 @@
-ustom C Database
+Custom C Database
 
 A simple custom C database implementation.
 
