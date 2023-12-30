@@ -13,16 +13,17 @@
 #define size_of_attribute(Struct, Attribute) sizeof(((Struct*)0)->Attribute) 
 // 0 is the null pointer. This trick allows us to access some unspecified attribute
 
-// Enumeration for meta command result
 typedef enum{  META_COMMAND_SUCCESS, META_COMMAND_UNRECOGNIZED_COMMAND} MetaCommandResult;
 
 typedef enum {PREPARE_SUCCESS,PREPARE_UNRECOGNIZED,PREPARE_SYNTAXERROR,PREPARE_STRING_TOO_LONG,PREPARE_ID_OOB} PrepareResult;
 
-// Enumeration for prepare result
 typedef enum { STATEMENT_INSERT, STATEMENT_SELECT } StatementType;
 
-// Enumeration for execute result
 typedef enum {EXECUTE_SUCCESS, EXECUTE_TABLE_FULL} ExecuteResult; 
+
+typedef enum{NODE_INTERNAL, NODE_LEAF} NodeType;
+
+
 
 // Structure for a database row
 typedef struct{
@@ -57,6 +58,14 @@ const uint32_t PAGE_SIZE = 4096;
 #define TABLE_MAX_PAGES 100
 const uint32_t ROWS_PER_PAGE = PAGE_SIZE / ROWSIZE;
 const uint32_t TABLE_MAX_ROWS = ROWS_PER_PAGE * TABLE_MAX_PAGES;
+
+const uint32_t NODE_TYPE_SIZE = sizeof(uint8_t);
+const uint32_t NODE_TYPE_OFFSET = sizeof(uint8_t);
+const uint32_t IS_ROOT_SIZE = sizeof(uint8_t);
+const uint32_t IS_ROOT_OFFSET = NODE_TYPE_SIZE;
+const uint32_t PARENT_POINTER_SIZE = sizeof(uint32_t);
+const uint32_t PARENT_POINTER_OFFSET = IS_ROOT_OFFSET + IS_ROOT_SIZE;
+const uint32_t COMMON_NODE_HEADER_SIZE = NODE_TYPE_SIZE + IS_ROOT_SIZE + PARENT_POINTER_OFFSET;
 
 
 //Struct for pager -> represents a file
