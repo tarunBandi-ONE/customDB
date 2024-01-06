@@ -119,7 +119,8 @@ typedef struct{
 
 typedef struct{
     Table* table;
-    uint32_t row_num;
+    uint32_t page_num;
+    uint32_t cell_num;
     bool end_of_table; // Indicates when one past the last element
 }Cursor;
 
@@ -213,24 +214,18 @@ void* get_page(Table* table, uint32_t page_num)
 void* cursor_value (Cursor* cursor)
 {
     //Given row n, and m rows per page, the page it's on is n/m
-    uint32_t pageNum = cursor->row_num/ROWS_PER_PAGE; 
+    uint32_t pageNum = cursor->page_num; 
     void* page = get_page(cursor->table,pageNum);
     //There are ROWS_PER_PAGE rows per page, so using mod we figure out what specific row it is.
     uint32_t row_offset = cursor->row_num % ROWS_PER_PAGE;
     //specific row within the page * the bytes it takes for each row gives us the amt of bytes to offset
-    uint32_t byteOffset = row_offset * ROWSIZE;
-    if (page + byteOffset == NULL)
-    {
-        printf("byteoffset: %d\n",byteOffset);
-    }
-    // Pointer arithmetic ~ use array to get the start of the page and offset it by how many rows you are within the page
-    return page + byteOffset;
-}
+    return leaf_node_value(page, cursor->cell_num);
 
 void cursor_advance(Cursor* cursor)
 {
-    cursor->row_num +=1;
-    if (cursor->row_num >= cursor->table->num_rows)
+    cursor->cell_num +=1;
+    void* node = get_page(cursor->table,cursor->page_num)
+    if (cursor->cell_num >= (*leaf_node_num_cells(node)))
     {
         cursor ->end_of_table = true;
     }
@@ -240,8 +235,12 @@ Cursor* table_start(Table* table)
 {
     Cursor* cursor = malloc(sizeof(Cursor));
     cursor->table = table;
-    cursor ->row_num = 0;
-    cursor ->end_of_table = false;
+    cursor ->page_num = table -> root_page_num;
+    cursor -> cell_num = 0;
+    
+    void* root_node = get_page(table, table->root_page_num);
+    uint32_t num_cells = *leaf_node_num_cells(root_node);
+    cursor -> end_of_table = (num_cells == 0);
     return cursor;
 }
 
@@ -249,7 +248,11 @@ Cursor* table_end(Table* table)
 {
     Cursor* cursor = malloc(sizeof(Cursor));
     cursor ->table = table;
-    cursor ->row_num = table->num_rows;
+    cursor ->page_num = table->root_page_num;
+
+    void* root_node = get_page(table->pager, table -> root_page_num);
+    uint32_t num_cells = *leaf_node_num_cells(root_node);
+    cursor-> cell_num = num_cells;
     cursor->end_of_table = true;
 
     return cursor;
