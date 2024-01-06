@@ -71,7 +71,7 @@ const uint32_t LEAF_NODE_HEADER_SIZE =
     COMMON_NODE_HEADER_SIZE + LEAF_NODE_NUM_CELLS_SIZE;
 const uint32_t LEAF_NODE_KEY_SIZE = sizeof(uint32_t);
 const uint32_t LEAF_NODE_KEY_OFFSET = 0;
-const uint32_t LEAF_NODE_VALUE_SIZE = ROW_SIZE;
+const uint32_t LEAF_NODE_VALUE_SIZE = ROWSIZE;
 const uint32_t LEAF_NODE_VALUE_OFFSET =
     LEAF_NODE_KEY_OFFSET + LEAF_NODE_KEY_SIZE;
 const uint32_t LEAF_NODE_CELL_SIZE = LEAF_NODE_KEY_SIZE + LEAF_NODE_VALUE_SIZE;
@@ -86,7 +86,7 @@ uint32_t* leaf_node_num_cells(void* node){
 
 void* leaf_node_cell(void* node, uint32_t cell_num){
 
-    return node + LEAF_NODE_HEADER_SIZE + cell_num * LEAF_NODE_CELL_SIZE
+    return node + LEAF_NODE_HEADER_SIZE + cell_num * LEAF_NODE_CELL_SIZE;
 }
 
 uint32_t* leaf_node_key(void* node, uint32_t cell_num)
@@ -203,9 +203,9 @@ void* get_page(Table* table, uint32_t page_num)
         table->pager->pages[page_num] = page;
     }
 
-    if (page_num >= pager->num_pages)
+    if (page_num >= table->pager->num_pages)
     {
-        pager->num_pages = page_num + 1;
+        table->pager->num_pages = page_num + 1;
     }
     return table->pager->pages[page_num];
 }
@@ -217,14 +217,13 @@ void* cursor_value (Cursor* cursor)
     uint32_t pageNum = cursor->page_num; 
     void* page = get_page(cursor->table,pageNum);
     //There are ROWS_PER_PAGE rows per page, so using mod we figure out what specific row it is.
-    uint32_t row_offset = cursor->row_num % ROWS_PER_PAGE;
     //specific row within the page * the bytes it takes for each row gives us the amt of bytes to offset
     return leaf_node_value(page, cursor->cell_num);
-
+}
 void cursor_advance(Cursor* cursor)
 {
     cursor->cell_num +=1;
-    void* node = get_page(cursor->table,cursor->page_num)
+    void* node = get_page(cursor->table,cursor->page_num);
     if (cursor->cell_num >= (*leaf_node_num_cells(node)))
     {
         cursor ->end_of_table = true;
@@ -313,7 +312,7 @@ ExecuteResult execute_insert(Table* T, Statement* S)
     Cursor* cursor = table_end(T);
     Row* r = &(S->row_toinsert);
 
-    leaf_node_insert(cursor, row_toinsert->id, row_toinsert);
+    leaf_node_insert(cursor, r->id, r);
     free(cursor);
     return EXECUTE_SUCCESS;
 
@@ -323,7 +322,6 @@ ExecuteResult execute_select(Table* T, Statement* S)
 {
     Cursor *cursor = table_start(T);
     Row row;
-    printf("%d\n",T->num_rows);
 
     while(!cursor->end_of_table)
     {
@@ -403,7 +401,7 @@ void pager_flush(Pager* p, int page_num)
     }
     ssize_t bytes_written = write(p->file_id, p->pages[page_num], PAGE_SIZE);
 
-    if (bytes_written != byte_num)
+    if (bytes_written != PAGE_SIZE)
     {
         printf("Writing error\n");
         exit(EXIT_FAILURE);
@@ -413,7 +411,6 @@ void db_close(Table* table)
 {
     printf("Closing: \n");
     Pager* p = table->pager;
-    printf("%d full\n",num_full);
     for(uint32_t i = 0; i < p->num_pages; i++)
     {
         printf("i: %d\n",i);
@@ -487,7 +484,7 @@ MetaCommandResult do_command(InputBuffer* input_buffer, Table* t) //Running a me
 }
 void leaf_node_insert(Cursor* c, uint32_t key, Row* value)
 {
-    void* node = get_page(Cursor->table,Cursor->page_num);
+    void* node = get_page(c->table,c->page_num);
 
     uint32_t num_cells = *leaf_node_num_cells(node);
 
@@ -499,16 +496,16 @@ void leaf_node_insert(Cursor* c, uint32_t key, Row* value)
     }
     if(c->cell_num < num_cells)
     {
-        for (int i = num_cells ; i > cursor->cell_num ; i--)
+        for (int i = num_cells ; i > c->cell_num ; i--)
         {
             memcpy(leaf_node_cell(node, i),leaf_node_cell(node, i - 1),LEAF_NODE_CELL_SIZE);
         }
     }
 
     *(leaf_node_num_cells(node)) += 1;
-    *(leaf_node_key(node, cursor -> cell_num)) = key;
+    *(leaf_node_key(node, c -> cell_num)) = key;
 
-    serialize_row(value, leaf_node_value(node, cursor-> cell_num));
+    serialize_row(value, leaf_node_value(node, c-> cell_num));
 }
 int main(int argc, char* argv[])
 {
