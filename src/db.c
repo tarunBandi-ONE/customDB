@@ -56,8 +56,7 @@ const uint32_t EMAIL_OFFSET = USERNAME_SIZE + USER_OFFSET;
 const uint32_t ROWSIZE = ID_SIZE + USERNAME_SIZE + EMAIL_SIZE; 
 const uint32_t PAGE_SIZE = 4096;
 #define TABLE_MAX_PAGES 100
-const uint32_t ROWS_PER_PAGE = PAGE_SIZE / ROWSIZE;
-const uint32_t TABLE_MAX_ROWS = ROWS_PER_PAGE * TABLE_MAX_PAGES;
+
 
 const uint32_t NODE_TYPE_SIZE = sizeof(uint8_t);
 const uint32_t NODE_TYPE_OFFSET = sizeof(uint8_t);
@@ -109,11 +108,12 @@ void initialize_leaf_node(void* node)
 typedef struct{
     int file_id;
     uint32_t fileLen;
+    uint32_t num_pages;
     void* pages[TABLE_MAX_PAGES];
 } Pager;
 
 typedef struct{
-    uint32_t num_rows;
+    uint32_t root_page_num;
     Pager* pager;
 }Table; //Pages is an array of void pointers ~ arbitrary memory pointers which we use the above offsets that we calculated to figure out size
 
@@ -200,6 +200,11 @@ void* get_page(Table* table, uint32_t page_num)
             }
         }
         table->pager->pages[page_num] = page;
+    }
+
+    if (page_num >= pager->num_pages)
+    {
+        pager->num_pages = page_num + 1;
     }
     return table->pager->pages[page_num];
 }
@@ -347,6 +352,13 @@ Pager* pager_open(const char* file)
     Pager* p = calloc(sizeof(Pager),1);
     p->file_id = fileData;
     p->fileLen = file_len;
+    p->num_pages = (file_len/ PAGE_SIZE);
+
+    if (file_len % PAGE_SIZE != 0)
+    {
+        printf("Not a whole number of pages");
+        exit(EXIT_FAILURE);
+    }
     for(int i =0; i < TABLE_MAX_PAGES; i++)
     {
         p->pages[i] = NULL;
@@ -367,7 +379,7 @@ Table* db_open(const char* file)
     return T;
 }
 
-void pager_flush(Pager* p, int page_num, int byte_num)
+void pager_flush(Pager* p, int page_num)
 {
     if(p->pages[page_num] == NULL)
     {
@@ -380,7 +392,7 @@ void pager_flush(Pager* p, int page_num, int byte_num)
         printf("Error seeking/moving cursor\n");
         exit(EXIT_FAILURE);
     }
-    ssize_t bytes_written = write(p->file_id, p->pages[page_num], byte_num);
+    ssize_t bytes_written = write(p->file_id, p->pages[page_num], PAGE_SIZE);
 
     if (bytes_written != byte_num)
     {
@@ -392,33 +404,20 @@ void db_close(Table* table)
 {
     printf("Closing: \n");
     Pager* p = table->pager;
-    uint32_t num_full = table->num_rows/ROWS_PER_PAGE;
     printf("%d full\n",num_full);
-    for(uint32_t i = 0; i <num_full; i++)
+    for(uint32_t i = 0; i < p->num_pages; i++)
     {
         printf("i: %d\n",i);
         void* page = p->pages[i];
         if(page != NULL)
         {
-            pager_flush(p, i, PAGE_SIZE);
+            pager_flush(p, i);
             free(page);
             p->pages[i] = NULL;
         }
 
     }
-    uint32_t next_rows = table->num_rows % ROWS_PER_PAGE;
-    if (next_rows > 0)
-    {
-        uint32_t pageNum = num_full;
-        void* thisPage = p->pages[pageNum];
-        if(thisPage != NULL)
-        {
-            pager_flush(p, pageNum, next_rows* ROWSIZE);
-            free(thisPage);
-            p->pages[pageNum] = NULL;
 
-        }
-    }
 
     int result = close(p->file_id);
     if(result == -1)
