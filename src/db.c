@@ -305,14 +305,15 @@ PrepareResult prepare_statement (Statement* s, InputBuffer* B) //load a statemen
 
 ExecuteResult execute_insert(Table* T, Statement* S) 
 {
-    if(T->num_rows >= TABLE_MAX_ROWS)
+    void* node = get_page(T->pager,T->root_page_num);
+    if((*leaf_node_num_cells(node)) >= LEAF_NODE_MAX_CELLS)
     {
         return EXECUTE_TABLE_FULL;
     }
     Cursor* cursor = table_end(T);
     Row* r = &(S->row_toinsert);
-    serialize_row(r,cursor_value(cursor)); //Copying from from the row, into the void* block 
-    T->num_rows+=1;
+
+    leaf_node_insert(cursor, row_toinsert->id, row_toinsert);
     free(cursor);
     return EXECUTE_SUCCESS;
 
@@ -378,7 +379,12 @@ Table* db_open(const char* file)
     Pager* P =  pager_open(file);
     uint32_t num_rows = P->fileLen / ROWSIZE;
     T->pager = P;
-    T->num_rows = num_rows;
+    T->root_page_num = 0;
+    if(P->num_pages == 0)
+    {
+        void* root_node = get_page(P,0);
+        initialize_leaf_node(root_node);
+    }
     return T;
 }
 
@@ -479,7 +485,31 @@ MetaCommandResult do_command(InputBuffer* input_buffer, Table* t) //Running a me
     return META_COMMAND_UNRECOGNIZED_COMMAND;
   }
 }
+void leaf_node_insert(Cursor* c, uint32_t key, Row* value)
+{
+    void* node = get_page(Cursor->table,Cursor->page_num);
 
+    uint32_t num_cells = *leaf_node_num_cells(node);
+
+    if(num_cells >= LEAF_NODE_MAX_CELLS)
+    {
+        printf("Split node\n");
+
+        exit(EXIT_FAILURE);
+    }
+    if(c->cell_num < num_cells)
+    {
+        for (int i = num_cells ; i > cursor->cell_num ; i--)
+        {
+            memcpy(leaf_node_cell(node, i),leaf_node_cell(node, i - 1),LEAF_NODE_CELL_SIZE);
+        }
+    }
+
+    *(leaf_node_num_cells(node)) += 1;
+    *(leaf_node_key(node, cursor -> cell_num)) = key;
+
+    serialize_row(value, leaf_node_value(node, cursor-> cell_num));
+}
 int main(int argc, char* argv[])
 {
 
