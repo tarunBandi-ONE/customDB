@@ -1,6 +1,6 @@
-Custom C Database
+Database 
 
-A simple custom C database implementation.
+Simple sqlite clone.
 
 ## Table of Contents
 
