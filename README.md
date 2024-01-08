@@ -1,6 +1,3 @@
-Database 
-
-Simple sqlite clone.
 
 ## Table of Contents
 
@@ -16,7 +13,7 @@ Simple sqlite clone.
 
     ## Introduction
 
-    This is a database implemented in C. I started this project to learn about how storing data on the disk worked and specifically gain proficiency with the inner workings of a database. 
+    A simple relational database developed as a clone to sqlite.
 
     ## Features
 

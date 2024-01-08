@@ -2,7 +2,7 @@ import subprocess
 
 def run_script(commands):
     raw_output = None
-    with subprocess.Popen(["../db"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True) as process:
+    with subprocess.Popen(["../db","test.db"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True) as process:
         for command in commands:
             process.stdin.write(command + "\n")
         process.stdin.close()
@@ -47,6 +47,16 @@ def test_inserting_maximum_length_strings():
     ]
     result = run_script(script)
     print(result)
+
+def test_printing_strings():
+    script = [
+        "insert 1 user1 person1@example.com",
+        "select",
+        ".constants",
+        ".btree"
+    ]
+    print(run_script(script))
+
 
 if __name__ == "__main__":
     test_insert_and_retrieve_row()
